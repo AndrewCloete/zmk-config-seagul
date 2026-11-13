@@ -5,7 +5,9 @@ manifest:
   projects:
     - name: zmk
       remote: zmkfirmware
-      revision: main
+      # Pinned to main (2026-10-09, Zephyr 4.1). Switch to v0.4 once released.
+      # Keep in sync with .github/workflows/build.yml.
+      revision: 4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85
       import: app/west.yml
   self:
     path: config
