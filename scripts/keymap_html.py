@@ -102,10 +102,9 @@ def render(defines, layers, conditions):
             cells = []
             for binding in row:
                 main, hint, cls = label(binding, defines, layers)
-                if cls == "trans":
-                    main = base[pos]
                 if i and pos in held.get(i, []):
                     cls, hint = cls + " held", hint or "held"
+                    main = main or base[pos]
                 cells.append(
                     f'<div class="key {cls}" title="{html.escape(binding)}">'
                     f"<span>{html.escape(main)}</span><small>{html.escape(hint)}</small></div>"
@@ -144,9 +143,19 @@ PAGE = """<!doctype html>
   .key small { font-size: 10px; color: var(--muted); }
   .layer span { color: var(--accent); }
   .trans, .none { background: transparent; border-style: dashed; }
-  .trans span { color: var(--muted); font-weight: 400; }
   .held { background: var(--hold); border-style: solid; }
-  .held span { color: var(--fg); font-weight: 600; }
+  @media print {
+    @page { size: A4 portrait; margin: 10mm; }
+    :root { --bg: #fff; --fg: #000; --key: #fff; --line: #999; --muted: #555; --accent: #1d4ed8; --hold: #fde68a; }
+    * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { padding: 0; font-size: 9pt; }
+    main { grid-template-columns: 1fr 1fr; gap: 6mm; }
+    section { break-inside: avoid; }
+    h2 { font-size: 10pt; }
+    .row { gap: 1mm; margin-bottom: 1mm; }
+    .key { width: 13mm; height: 10mm; border-radius: 1.5mm; }
+    .key small { font-size: 6pt; }
+  }
 </style>
 <main>
 {cards}
