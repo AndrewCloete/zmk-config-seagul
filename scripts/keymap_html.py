@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the ZMK keymap as a single HTML page, one grid per layer.
+"""Render the base layer of the ZMK keymap as a single HTML page.
 
 Usage: scripts/keymap_html.py [keymap] [output.html]
 
@@ -60,10 +60,7 @@ def parse(text):
         rows = [["&" + b.strip() for b in line.split("&") if b.strip()]
                 for line in m[2].strip().splitlines() if line.strip()]
         layers.append({"name": m[1], "rows": rows, "sensor": (m[3] or "").strip()})
-    conditions = {}
-    for ifs, then in re.findall(r"if-layers\s*=\s*<([^>]*)>;\s*then-layer\s*=\s*<([^>]*)>;", text):
-        conditions[layer_index(then.strip(), defines)] = [layer_index(i, defines) for i in ifs.split()]
-    return defines, layers, conditions
+    return defines, layers
 
 
 def layer_index(arg, defines):
@@ -93,49 +90,23 @@ def label(binding, defines, layers):
     return html.escape(" ".join([behavior, *args])), "", ""
 
 
-def activators(layers, defines, conditions):
-    """Map layer index -> flat key positions on the base layer that activate it."""
-    found = {}
-    for pos, binding in enumerate(b for row in layers[0]["rows"] for b in row):
-        behavior, *args = binding[1:].split()
-        if behavior in {"mo", "tog"} | LAYER_TAPS:
-            found.setdefault(layer_index(args[0], defines), []).append(pos)
-    for then, ifs in conditions.items():
-        found[then] = [p for i in ifs for p in found.get(i, [])]
-    return found
-
-
-def render(defines, layers, conditions):
-    held = activators(layers, defines, conditions)
-    base = [label(b, defines, layers)[0] for row in layers[0]["rows"] for b in row]
-    cards = []
-    for i, layer in enumerate(layers):
-        note = ""
-        if i in conditions:
-            note = "active while " + " + ".join(layers[j]["name"] for j in conditions[i]) + " are held"
-        rows, pos = [], 0
-        for row in layer["rows"]:
-            cells = []
-            for binding in row:
-                main, hint, cls = label(binding, defines, layers)
-                if i and pos in held.get(i, []):
-                    cls, hint = cls + " held", hint or "held"
-                    main = main or base[pos]
-                cells.append(
-                    f'<div class="key {cls}" title="{html.escape(binding)}">'
-                    f"<span>{main}</span><small>{hint}</small></div>"
-                )
-                pos += 1
-            rows.append('<div class="row">' + "".join(cells) + "</div>")
-        encoder = ""
-        if layer["sensor"]:
-            _, cw, ccw = layer["sensor"].lstrip("&").split()
-            encoder = f'<p class="enc">Encoder: ↻ {dual(cw)} &nbsp; ↺ {dual(ccw)}</p>'
-        cards.append(
-            f'<section><h2>{i} · {html.escape(layer["name"])}</h2>'
-            f'<p class="note">{html.escape(note)}</p>{"".join(rows)}{encoder}</section>'
-        )
-    return PAGE.replace("{cards}", "\n".join(cards))
+def render(defines, layers):
+    layer = layers[0]
+    rows = []
+    for row in layer["rows"]:
+        cells = []
+        for binding in row:
+            main, hint, cls = label(binding, defines, layers)
+            cells.append(
+                f'<div class="key {cls}" title="{html.escape(binding)}">'
+                f"<span>{main}</span><small>{hint}</small></div>"
+            )
+        rows.append('<div class="row">' + "".join(cells) + "</div>")
+    encoder = ""
+    if layer["sensor"]:
+        _, cw, ccw = layer["sensor"].lstrip("&").split()
+        encoder = f'<p class="enc">Encoder: ↻ {dual(cw)} &nbsp; ↺ {dual(ccw)}</p>'
+    return PAGE.replace("{layer}", f'<h2>{html.escape(layer["name"])}</h2>{"".join(rows)}{encoder}')
 
 
 PAGE = """<!doctype html>
@@ -143,15 +114,13 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Seagull Keymap</title>
 <style>
-  :root { --bg: #fafafa; --fg: #222; --key: #fff; --line: #ccc; --muted: #888; --accent: #2a6fdb; --hold: #fde68a; }
+  :root { --bg: #fafafa; --fg: #222; --key: #fff; --line: #ccc; --muted: #888; --accent: #2a6fdb; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1b1d; --fg: #eee; --key: #2a2a2e; --line: #444; --muted: #888; --accent: #7aa7ff; --hold: #6b5a1e; }
+    :root { --bg: #1b1b1d; --fg: #eee; --key: #2a2a2e; --line: #444; --muted: #888; --accent: #7aa7ff; }
   }
   body { background: var(--bg); color: var(--fg); font: 14px system-ui, sans-serif; margin: 0; padding: 16px; }
-  main { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 24px; }
-  h2 { font-size: 15px; margin: 0 0 2px; }
-  .note, .enc { color: var(--muted); margin: 0 0 8px; min-height: 1em; }
-  .enc { margin-top: 8px; color: var(--fg); }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  .enc { margin: 8px 0 0; }
   .row { display: flex; gap: 4px; margin-bottom: 4px; }
   .key { width: 68px; height: 52px; border: 1px solid var(--line); border-radius: 6px; background: var(--key);
          display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
@@ -164,24 +133,21 @@ PAGE = """<!doctype html>
   .r { display: none; }
   body:has(#resolve:checked) .k { display: none; }
   body:has(#resolve:checked) .r { display: inline; }
-  .held { background: var(--hold); border-style: solid; }
   @media print {
     @page { size: A4 portrait; margin: 10mm; }
-    :root { --bg: #fff; --fg: #000; --key: #fff; --line: #999; --muted: #555; --accent: #1d4ed8; --hold: #fde68a; }
+    :root { --bg: #fff; --fg: #000; --key: #fff; --line: #999; --muted: #555; --accent: #1d4ed8; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    body { padding: 0; font-size: 9pt; }
+    body { padding: 0; font-size: 11pt; }
     .toggle { display: none; }
-    main { grid-template-columns: 1fr 1fr; gap: 6mm; }
-    section { break-inside: avoid; }
-    h2 { font-size: 10pt; }
-    .row { gap: 1mm; margin-bottom: 1mm; }
-    .key { width: 13mm; height: 10mm; border-radius: 1.5mm; }
-    .key small { font-size: 6pt; }
+    h2 { font-size: 12pt; }
+    .row { gap: 1.5mm; margin-bottom: 1.5mm; }
+    .key { width: 20mm; height: 15mm; border-radius: 2mm; }
+    .key small { font-size: 7pt; }
   }
 </style>
 <label class="toggle"><input type="checkbox" id="resolve"> Show what the keys do in Resolve</label>
 <main>
-{cards}
+{layer}
 </main>
 """
 
