@@ -134,7 +134,8 @@ PAGE = """<!doctype html>
   body:has(#resolve:checked) .k { display: none; }
   body:has(#resolve:checked) .r { display: inline; }
   @media print {
-    @page { size: A4 portrait; margin: 10mm; }
+    @page { size: A4 portrait; margin: 20mm; }
+    main { width: fit-content; margin: 0 auto; }
     :root { --bg: #fff; --fg: #000; --key: #fff; --line: #999; --muted: #555; --accent: #1d4ed8; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { padding: 0; font-size: 11pt; }
