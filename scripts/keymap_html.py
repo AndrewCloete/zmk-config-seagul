@@ -22,6 +22,16 @@ KEYS = {
     "EQUAL": "=", "MINUS": "-", "COMMA": ",", "DOT": ".", "SLASH": "/", "SEMI": ";",
     "PSCRN": "PrtSc", "C_PLAY_PAUSE": "⏯", "C_VOL_UP": "Vol+", "C_VOL_DN": "Vol−",
 }
+# What each key code does in DaVinci Resolve (macOS defaults), keyed by ZMK code.
+RESOLVE = {
+    "A": "Select", "B": "Blade", "T": "Trim", "N": "Snap", "E": "Edge",
+    "LG(B)": "Split", "LS(BSPC)": "Ripple", "LG(Z)": "Undo", "LG(LS(Z))": "Redo",
+    "SPACE": "Play", "LS(Z)": "Fit",
+    "RIGHT": "+1 frame", "LEFT": "−1 frame", "LS(RIGHT)": "+1 sec", "LS(LEFT)": "−1 sec",
+    "LG(EQUAL)": "Zoom in", "LG(MINUS)": "Zoom out",
+    "DOT": "Nudge +1", "COMMA": "Nudge −1", "LS(DOT)": "Nudge +n", "LS(COMMA)": "Nudge −n",
+    "DOWN": "Next edit", "UP": "Prev edit",
+}
 # Layer-tap style behaviours: first argument is the layer held, second the key tapped.
 LAYER_TAPS = {"lt", "lt_now"}
 
@@ -31,6 +41,12 @@ def key(code):
     if m:
         return MODS.get(m[1], m[1] + "+") + key(m[2])
     return KEYS.get(code, code)
+
+
+def dual(code):
+    """HTML showing the key, or its Resolve action when the toggle is on."""
+    k, r = html.escape(key(code)), html.escape(RESOLVE.get(code, key(code)))
+    return k if k == r else f'<i class="k">{k}</i><i class="r">{r}</i>'
 
 
 def parse(text):
@@ -55,17 +71,17 @@ def layer_index(arg, defines):
 
 
 def label(binding, defines, layers):
-    """Return (main label, small hint, css class) for one binding."""
+    """Return (main label as HTML, small hint, css class) for one binding."""
     behavior, *args = binding[1:].split()
-    name = lambda arg: layers[layer_index(arg, defines)]["name"]
+    name = lambda arg: html.escape(layers[layer_index(arg, defines)]["name"])
     if behavior == "kp":
-        return key(args[0]), "", ""
+        return dual(args[0]), "", ""
     if behavior == "mo":
         return name(args[0]), "hold", "layer"
     if behavior == "tog":
         return name(args[0]), "toggle", "layer"
     if behavior in LAYER_TAPS:
-        return key(args[1]), "hold: " + name(args[0]), "layer"
+        return dual(args[1]), "hold: " + name(args[0]), "layer"
     if behavior == "trans":
         return "", "", "trans"
     if behavior == "none":
@@ -74,7 +90,7 @@ def label(binding, defines, layers):
         return ("BT " + args[1]) if args[0] == "BT_SEL" else args[0].replace("BT_", "BT "), "", ""
     if behavior == "bootloader":
         return "Boot", "", ""
-    return " ".join([behavior, *args]), "", ""
+    return html.escape(" ".join([behavior, *args])), "", ""
 
 
 def activators(layers, defines, conditions):
@@ -107,14 +123,14 @@ def render(defines, layers, conditions):
                     main = main or base[pos]
                 cells.append(
                     f'<div class="key {cls}" title="{html.escape(binding)}">'
-                    f"<span>{html.escape(main)}</span><small>{html.escape(hint)}</small></div>"
+                    f"<span>{main}</span><small>{hint}</small></div>"
                 )
                 pos += 1
             rows.append('<div class="row">' + "".join(cells) + "</div>")
         encoder = ""
         if layer["sensor"]:
             _, cw, ccw = layer["sensor"].lstrip("&").split()
-            encoder = f'<p class="enc">Encoder: ↻ {html.escape(key(cw))} &nbsp; ↺ {html.escape(key(ccw))}</p>'
+            encoder = f'<p class="enc">Encoder: ↻ {dual(cw)} &nbsp; ↺ {dual(ccw)}</p>'
         cards.append(
             f'<section><h2>{i} · {html.escape(layer["name"])}</h2>'
             f'<p class="note">{html.escape(note)}</p>{"".join(rows)}{encoder}</section>'
@@ -143,12 +159,18 @@ PAGE = """<!doctype html>
   .key small { font-size: 10px; color: var(--muted); }
   .layer span { color: var(--accent); }
   .trans, .none { background: transparent; border-style: dashed; }
+  .toggle { display: block; margin-bottom: 16px; }
+  i { font-style: normal; }
+  .r { display: none; }
+  body:has(#resolve:checked) .k { display: none; }
+  body:has(#resolve:checked) .r { display: inline; }
   .held { background: var(--hold); border-style: solid; }
   @media print {
     @page { size: A4 portrait; margin: 10mm; }
     :root { --bg: #fff; --fg: #000; --key: #fff; --line: #999; --muted: #555; --accent: #1d4ed8; --hold: #fde68a; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { padding: 0; font-size: 9pt; }
+    .toggle { display: none; }
     main { grid-template-columns: 1fr 1fr; gap: 6mm; }
     section { break-inside: avoid; }
     h2 { font-size: 10pt; }
@@ -157,6 +179,7 @@ PAGE = """<!doctype html>
     .key small { font-size: 6pt; }
   }
 </style>
+<label class="toggle"><input type="checkbox" id="resolve"> Show what the keys do in Resolve</label>
 <main>
 {cards}
 </main>
