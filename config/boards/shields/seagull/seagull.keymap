@@ -41,7 +41,7 @@
         layer_edit {
             display-name = "Edit";
             bindings = <
-                &kp A          &kp B          &kp T      &kp N
+                &kp A          &kp T          &kp B      &kp N
                 &kp LG(B)      &kp LS(BSPC)   &kp LG(Z)  &kp LG(LS(Z))
                 &mo ZOOM       &mo NUDGE      &mo JUMP   &kp E          &tog BLUETOOTH
                 &lt_now SECONDS SPACE  &kp LS(Z)      &kp F18    &kp F19
